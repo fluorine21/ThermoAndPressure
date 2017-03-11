@@ -7,25 +7,28 @@
 
 // Example creating a thermocouple instance with software SPI on any three
 // digital IO pins.
-#define MAXDO1  3
-#define MAXCS1  4
-#define MAXCLK1 5
+#define MAXDO1  23
+#define MAXCS1  22
+#define MAXCLK1 21
 //Need to remeber to set the rest of these pins correctly
 Adafruit_MAX31855 thermocouple1(MAXCLK1, MAXCS1, MAXDO1);
 #define MAXDO2  3
 #define MAXCS2  4
 #define MAXCLK2 5
 Adafruit_MAX31855 thermocouple2(MAXCLK2, MAXCS2, MAXDO2);
-#define MAXDO3  3
-#define MAXCS3  4
-#define MAXCLK3 5
+#define MAXDO3  7
+#define MAXCS3  8
+#define MAXCLK3 9
 Adafruit_MAX31855 thermocouple3(MAXCLK3, MAXCS3, MAXDO3);
 
 int halleffect = 7;
-int pressure1 = A4;
-int pressure2 = A5;//This will need to be changed most likely
-int NOX = A6;
-int SOX = A7;
+int pressure1 = A3;
+int pressure2 = A5;
+int NOX = A16;
+int SOX = A18;//These will need to be corrected
+int CO = A19;
+int CO2 = A20;
+int flow = A14;
 int LED = 13;
 int state = 0; //0 for off, 1 for on
 int inbyte = 48;
@@ -36,14 +39,12 @@ boolean stringComplete = false, newData = false;  // whether the string is compl
 
 void setup() {
   
-  inputString.reserve(200);
+  inputString.reserve(200);//Reserves space for the input over serial
   pinMode(halleffect, INPUT_PULLUP); //Sets up Hall Effect Sensor as input w/ a 20kohm pullup
-  pinMode(pressure1, INPUT); //Sets up Pressure Transducer
-  pinMode(pressure2, INPUT); //Sets up Pressure Transducer
   pinMode(LED, OUTPUT);
   
   Serial.begin(9600);
-  digitalWrite(LED, HIGH);
+  digitalWrite(LED, HIGH);//Blinks to perform a good boot
   delay(500);
   digitalWrite(LED, LOW);
   analogReadResolution(16);//Sets analog resolution to its highest value (max 65535);
@@ -68,14 +69,16 @@ void loop(){
     newData = false;
     }
   if(state){
-  long time = millis();
   double thermo1Total = 0; double thermo2Total = 0; double thermo3Total = 0;
-  double hallTotal = 0;
+  //double hallTotal = 0;
   double pressure1Total = 0; double pressure2Total = 0;
   double NOXTotal = 0; double SOXTotal = 0;
+  double COTotal = 0; double CO2Total = 0;
+  double flowTotal = 0;
   int i = 0;
-  //Averages ten readings to eliminate noise
-  for(i = 0; i < 10; i ++){
+  long time = millis();
+  //Averages 5 readings to eliminate noise
+  for(i = 0; i < 5; i ++){
       thermo1Total += readThermo(1);
       thermo2Total += readThermo(2);
       thermo3Total += readThermo(3);
@@ -84,16 +87,20 @@ void loop(){
       pressure2Total += readPressure(2);
       NOXTotal += readNOX();
       SOXTotal += readSOX();
+      COTotal += readCO();
+      CO2Total += readCO2();
+      flowTotal += readFlow();
     }
   //Calculates the average
-  thermo1Total = thermo1Total/10.0; thermo2Total = thermo2Total/10.0; thermo3Total = thermo3Total/10.0;
-  hallTotal = hallTotal/10.0;
-  pressure1Total = pressure1Total/10.0; pressure2Total = pressure2Total/10.0; 
-  NOXTotal = NOXTotal/10.0; SOXTotal = SOXTotal/10.0; 
-  result = "Temp1: " + (String)thermo1Total + "C, Temp2: " + (String)thermo2Total + "C, Temp3: " + (String)thermo3Total + "C, Pressure1: " + (String)pressure1Total + " psi, Pressure2: " + (String)pressure2Total + " psi, NOX: " + NOXTotal + " %, SOX: " + SOXTotal; 
-  //waits 1 second between readouts
-  while(millis()-time < 1000){
-    }
+  thermo1Total = thermo1Total/5.0; thermo2Total = thermo2Total/5.0; thermo3Total = thermo3Total/5.0;
+  //hallTotal = hallTotal/10.0;
+  pressure1Total = pressure1Total/5.0; pressure2Total = pressure2Total/5.0; 
+  NOXTotal = NOXTotal/5.0; SOXTotal = SOXTotal/5.0;
+  COTotal = COTotal/5.0; CO2Total = CO2Total/5.0;
+  flowTotal = flowTotal/5.0; 
+  result = "Temp1: " + (String)thermo1Total + " C, Temp2: " + (String)thermo2Total + " C, Temp3: " + (String)thermo3Total + " C, Flow Rate: " + flowTotal + " l/s, Pressure1: " + (String)pressure1Total + " psi, Pressure2: " + (String)pressure2Total + " psi, NOX: " + NOXTotal + " %, SOX: " + SOXTotal + " %, CO: " + COTotal + " %, CO2: " + CO2Total + " %"; 
+  //Waits at least 1 second
+  while(millis()-time < 1000);
   writeString(result);
   Serial.write('\n');
   //Blinks LED on readout
@@ -105,7 +112,7 @@ void loop(){
 }
 void writeString(String stringData) { // Used to serially push out a String with Serial.write()
 
-  for (int i = 0; i < stringData.length(); i++)
+  for (unsigned int i = 0; i < stringData.length(); i++)
   {
     Serial.write(stringData[i]);   // Push each char 1 by 1 on each loop pass
   }
@@ -156,6 +163,15 @@ double readNOX(){
 double readSOX(){
   return analogRead(SOX)/2.0;
   }
-
+double readCO(){
+  return analogRead(CO);
+  }
+double readCO2(){
+  return analogRead(CO2);
+  }
+double readFlow(){
+  return analogRead(flow)/2.0;
+  }
+  
   
 
