@@ -1,24 +1,25 @@
 
-#include <SPI.h>
+
 #include "Adafruit_MAX31855.h"
 //Include Teensy ADC library ( https://github.com/pedvide/ADC )
 #include <ADC.h>
 
+#define HWSERIAL Serial1
 
 // Example creating a thermocouple instance with software SPI on any three
 // digital IO pins.
 #define MAXDO3  23
-#define MAXCS3  22
-#define MAXCLK3 21
+#define MAXCS3  21
+#define MAXCLK3 20
 //Need to remeber to set the rest of these pins correctly
 
-#define MAXDO2  3
-#define MAXCS2  4
-#define MAXCLK2 5
+#define MAXDO2  1 
+#define MAXCS2  2
+#define MAXCLK2 3
 
-#define MAXDO1  7
-#define MAXCS1  8
-#define MAXCLK1 9
+#define MAXDO1  5
+#define MAXCS1  6
+#define MAXCLK1 7
 
 Adafruit_MAX31855 thermocouple1(MAXCLK1, MAXCS1, MAXDO1);
 Adafruit_MAX31855 thermocouple2(MAXCLK2, MAXCS2, MAXDO2);
@@ -43,6 +44,8 @@ String inputString = "";         // a string to hold incoming data
 String result; //Holds data waiting to be pushed out over serial
 boolean stringComplete = false, newData = false;  // whether the string is complete
 
+double indexer = 0;
+
 double flowCorrectionValue = 183; //(l/s)/V
 double pressure1CorrectionValue = 0.00134; // V/psi
 double pressure2CorrectionValue = 0.00148; // V/psi
@@ -60,10 +63,15 @@ void setup() {
   pinMode(LED, OUTPUT);
   
   Serial.begin(9600);
+  HWSERIAL.begin(9600);
+  
   digitalWrite(LED, HIGH);//Blinks to perform a good boot
   delay(500);
   digitalWrite(LED, LOW);
   analogReadResolution(16);//Sets analog resolution to its highest value (max 65535);
+  indexer = 0;
+
+  
 }
 
 void loop(){
@@ -74,15 +82,17 @@ void loop(){
   } 
   if(newData && inbyte == 48){
     state = 0;
-    writeString("STOP");
-    Serial.write('\n');
+    Serial.println("STOP");
     newData = false;
+    indexer = 0;
     }
   else if(newData){
     state = 1;
-    writeString("START");
-    Serial.write('\n');
+    Serial.println("START");
+    result = "Data,Temp1,Temp2,Temp3,Flow Rate (l/s),Pressure1 (psi),Pressure2 (psi),NOX (ppm),SOX (ppm),CO(ppm),CO2 (%),O2 (%),UFM (p/cm^3 x 10^6)" ;
+    Serial.println(result);
     newData = false;
+    indexer = 0;
     }
   if(state){
   double thermo1Total = 0; double thermo2Total = 0; double thermo3Total = 0;
@@ -120,26 +130,18 @@ void loop(){
   O2Total = O2Total/avgs;
   UFPMTotal = UFPMTotal/avgs;
   flowTotal = flowTotal/avgs; 
-  result = "Temp1: " + (String)thermo1Total + " C, Temp2: " + (String)thermo2Total + " C, Temp3: " + (String)thermo3Total + " C, Flow Rate: " + flowTotal + " l/s, Pressure1: " + (String)pressure1Total + " psi, Pressure2: " + (String)pressure2Total + " psi, NOX: " + NOXTotal + " ppm, SOX: " + SOXTotal + " ppm, CO: " + COTotal + " ppm, CO2: " + CO2Total + " %, O2: " + O2Total + " %, UFMP: " + UFPMTotal + " p/cm^3 x 10^6" ; 
+  result = (String)(int)indexer + "," + (String)thermo1Total + "," + (String)thermo2Total + "," + (String)thermo3Total + "," + flowTotal + "," + (String)pressure1Total + "," + (String)pressure2Total + "," + (String)NOXTotal + "," + (String)SOXTotal + "," + (String)COTotal + "," + (String)CO2Total + "," + (String)O2Total + "," + (String)UFPMTotal;
   //Waits at least 1 second
   while(millis()-time < 1000);
-  writeString(result);
-  Serial.write('\n');
+  Serial.println(result);
   //Blinks LED on readout
   digitalWrite(LED, HIGH);
   delay(100);
   digitalWrite(LED, LOW);
   }
+  indexer++;
 
 }
-void writeString(String stringData) { // Used to serially push out a String with Serial.write()
-
-  for (unsigned int i = 0; i < stringData.length(); i++)
-  {
-    Serial.write(stringData[i]);   // Push each char 1 by 1 on each loop pass
-  }
-
-}// end writeString
 
 //Calls whichever TC is selected and returns the temp
 double readThermo(int i){
